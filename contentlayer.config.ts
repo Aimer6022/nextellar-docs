@@ -4,14 +4,34 @@ import remarkGfm from 'remark-gfm';
 import { codeImport } from 'remark-code-import';
 import rehypeSlug from 'rehype-slug';
 import highlight from 'rehype-highlight';
-import fs from 'fs';
-import path from 'path';
+
+// OPTIMIZATION: Simple cache to avoid re-parsing the same versioned paths
+// In a real scenario with repeated builds, this prevents redundant regex matching
+const versionedPathCache = new Map();
+
+function parseVersionedPath(sourceFilePath) {
+  // Check cache first
+  if (versionedPathCache.has(sourceFilePath)) {
+    return versionedPathCache.get(sourceFilePath);
+  }
+
+  const versionMatch = sourceFilePath.match(/versions\/(v[\d.]+(?:-[\w.]+)?\/)(.+)/);
+  const result = versionMatch
+    ? {
+        version: versionMatch[1].slice(0, -1), // Remove trailing slash
+        slug: versionMatch[2].replace(/\.mdx?$/, ''),
+      }
+    : null;
+
+  versionedPathCache.set(sourceFilePath, result);
+  return result;
+}
 
 export const Post = defineDocumentType(() => ({
   name: 'Docs',
   contentType: 'mdx',
   filePathPattern: `**/*.mdx`,
-  markdown: { fileExtensions: ['mdx', 'md'] }, // Ensure it watches these files
+  markdown: { fileExtensions: ['mdx', 'md'] },
   fields: {
     title: { type: 'string', required: true },
     description: { type: 'string', required: false },
@@ -40,14 +60,15 @@ export const VersionedPost = defineDocumentType(() => ({
     date: { type: 'date', required: false },
   },
   computedFields: {
+    // OPTIMIZATION: Pre-parse versioned data to avoid redundant regex matching across computed fields
+    // Before: Each of url, slug, version computed fields ran their own regex match (~3 per doc)
+    // After: Single regex match per document, cached for reuse
     url: {
       type: 'string',
       resolve: (post) => {
-        // Extract version from path: versions/v1.0.0/getting-started/intro -> /docs/v1.0.0/getting-started/intro
-        const match = post._raw.sourceFilePath.match(/versions\/(v[\d.]+(?:-[\w.]+)?)\/(.*)/);
-        if (match) {
-          const [, version, slug] = match;
-          return `/docs/${version}/${slug.replace(/\.mdx?$/, '')}`;
+        const parsed = parseVersionedPath(post._raw.sourceFilePath);
+        if (parsed) {
+          return `/docs/${parsed.version}/${parsed.slug}`;
         }
         return `/docs/${post._raw.flattenedPath}`;
       },
@@ -55,20 +76,15 @@ export const VersionedPost = defineDocumentType(() => ({
     slug: {
       type: 'string',
       resolve: (doc) => {
-        // Extract slug from versioned path: versions/v1.0.0/getting-started/intro -> getting-started/intro
-        const match = doc._raw.sourceFilePath.match(/versions\/v[\d.]+(?:-[\w.]+)?\/(.*)/);
-        if (match) {
-          return match[1].replace(/\.mdx?$/, '');
-        }
-        return doc._raw.flattenedPath;
+        const parsed = parseVersionedPath(doc._raw.sourceFilePath);
+        return parsed ? parsed.slug : doc._raw.flattenedPath;
       },
     },
     version: {
       type: 'string',
       resolve: (doc) => {
-        // Extract version: versions/v1.0.0/... -> 1.0.0
-        const match = doc._raw.sourceFilePath.match(/versions\/(v[\d.]+(?:-[\w.]+)?)\//);
-        return match ? match[1].slice(1) : 'current';
+        const parsed = parseVersionedPath(doc._raw.sourceFilePath);
+        return parsed ? parsed.version.slice(1) : 'current'; // Remove 'v' prefix
       },
     },
   },
