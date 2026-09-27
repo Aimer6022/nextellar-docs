@@ -1,5 +1,10 @@
-// src/app/doc/layout.tsx
-'use client';
+// src/app/docs/layout.tsx
+import { Metadata } from 'next';
+import { docsRootMetadata } from 'config/docs-meta';
+
+export const metadata: Metadata = docsRootMetadata;
+
+('use client');
 
 import React from 'react';
 import { allDocs } from 'contentlayer/generated';
@@ -141,7 +146,9 @@ export default function DocsLayout({
             </div>
           </Header>
           {/* <div className={`grid xl:grid xl:grid-cols-[1fr_270px]`}> */}
-          <main className="overflow-auto p-6">{children}</main>
+          <main id="main-content" className="overflow-auto p-6" lang="en">
+            {children}
+          </main>
         </MainContent>
       </SidebarProvider>
 
