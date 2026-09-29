@@ -28,11 +28,12 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky",
-    "test": "vitest run",
+    "test": "npm run test:unit",
     "test:unit": "vitest run",
     "test:validation": "vitest run scripts/validate-search-index.test.ts",
     "validate:sidebar": "node scripts/validate-sidebar.cjs",
     "check:links": "node scripts/check-links.cjs",
+    "audit:frontmatter": "node scripts/audit-frontmatter-comprehensive.cjs"
     "check:links:all": "node scripts/link-checker.mjs",
     "check:links:external": "node scripts/link-checker.mjs --check-external"
   },
